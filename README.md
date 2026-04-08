@@ -1,10 +1,13 @@
 # proxy.sh
 
-一个尽量简单、适合个人 `zsh` 日常使用的代理配置方案。
+一个用于个人 shell 日常使用的代理脚本仓库，当前同时提供两个版本：
 
-如果你主要是在自己的 `zsh` 里使用，推荐直接用仓库里的 `.proxy.sh`，把它 `source` 到 `~/.zshrc`。这样之后你就可以直接用 `proxy on/off/status/test/git ...`。
+- `.proxy.sh`：当前完整版本，带彩色输出、连通性测试、批量测试
+- `.proxy.simple.sh`：最简版本，保留基础代理管理和 `test`，不带彩色输出
 
-## 推荐用法：`.proxy.sh`
+## 推荐用法
+
+### 完整版：`.proxy.sh`
 
 把下面这行加入 `~/.zshrc`：
 
@@ -36,14 +39,32 @@ proxy git status
 proxy git off
 ```
 
-### 手动指定代理
+### 最简版：`.proxy.simple.sh`
+
+如果你只想要最基础的代理开关和 Git 代理管理，可以使用：
 
 ```zsh
+source /绝对路径/cli-proxy/.proxy.simple.sh
+```
+
+可用命令：
+
+```zsh
+proxy on
+proxy socks5
 proxy set http://127.0.0.1:7897
 proxy set socks5 127.0.0.1:7897
+proxy test
+proxy off
+proxy status
+proxy git on
+proxy git status
+proxy git off
 ```
 
 ## 命令说明
+
+### `.proxy.sh`
 
 - `proxy on`
   - 使用默认 HTTP 代理 `http://${PROXY_HOST}:${PROXY_HTTP_PORT}`
@@ -80,16 +101,23 @@ proxy set socks5 127.0.0.1:7897
   - 管理 `git config --global` 里的代理
   - `proxy git status` 也使用统一的状态输出风格
 
+### `.proxy.simple.sh`
+
+- 保留：`on`、`socks5`、`set`、`off`、`status`、`test`、`git on|off|status`
+- 不包含：彩色输出、`test_all`
+- `test` 使用纯文本输出，适合更老一点的 shell 环境
+- 输出为纯文本，尽量使用更朴素的 shell 写法，适合更老一点的 shell 环境
+
 ## 输出示例
 
-### `proxy test`
+### `.proxy.sh` 的 `proxy test`
 
 ```text
 › proxy http://127.0.0.1:7897
 ✔ google.com         302  1329ms
 ```
 
-### `proxy test_all`
+### `.proxy.sh` 的 `proxy test_all`
 
 ```text
 › proxy http://127.0.0.1:7897
@@ -102,14 +130,13 @@ proxy set socks5 127.0.0.1:7897
 ✔ summary: 5/5 success, 0 failed
 ```
 
-### `proxy status`
+### `.proxy.simple.sh` 的 `proxy status`
 
 ```text
-› status current shell
-  http_proxy   未设置
-  https_proxy  未设置
-  all_proxy    未设置
-  no_proxy     未设置
+http_proxy=未设置
+https_proxy=未设置
+all_proxy=未设置
+no_proxy=未设置
 ```
 
 ## 可选环境变量
@@ -121,8 +148,8 @@ proxy set socks5 127.0.0.1:7897
 
 ## 说明
 
-- `.proxy.sh` 只影响当前 shell 会话和 Git 全局配置
-- 不会自动写入 `~/.zshrc`，需要你自己 `source`
-- 不会创建本地配置文件
-- `test_all` 内部会并发探测多个目标站点
-- 这是给个人 shell 环境用的简化版本，优先追求顺手，不追求复杂抽象
+- 两个脚本都只影响当前 shell 会话和 Git 全局配置
+- 都不会自动写入 `~/.zshrc`，需要你自己 `source`
+- 都不会创建本地配置文件
+- `.proxy.sh` 更偏向日常使用体验
+- `.proxy.simple.sh` 更偏向最小实现和更简单的兼容性
