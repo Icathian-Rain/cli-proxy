@@ -14,6 +14,12 @@
 : "${PROXY_SOCKS5_PORT:=${PROXY_HTTP_PORT}}"
 : "${PROXY_NO_PROXY:=localhost,127.0.0.1}"
 
+_proxy_color_red='\033[31m'
+_proxy_color_green='\033[32m'
+_proxy_color_blue='\033[34m'
+_proxy_color_dim='\033[2m'
+_proxy_color_reset='\033[0m'
+
 _proxy_http_url() {
   printf '%s\n' "http://${PROXY_HOST}:${PROXY_HTTP_PORT}"
 }
@@ -60,8 +66,142 @@ _proxy_is_success() {
 _proxy_probe() {
   local proxy_url="$1"
   local url="$2"
+  local result
+  local curl_exit
 
-  curl -x "$proxy_url" -o /dev/null -sS --connect-timeout 5 --max-time 10 -w '%{http_code} %{time_total}' "$url" 2>/dev/null || printf '%s' 'FAILED 0'
+  result=$(curl -x "$proxy_url" -o /dev/null -sS --connect-timeout 5 --max-time 10 -w '%{http_code} %{time_total}' "$url" 2>/dev/null)
+  curl_exit=$?
+
+  if [ "$curl_exit" -eq 0 ]; then
+    printf '%s %s\n' "$result" "$curl_exit"
+  else
+    printf '000 0 %s\n' "$curl_exit"
+  fi
+}
+
+_proxy_target_name() {
+  local url="$1"
+  local name
+
+  name="${url#*://}"
+  name="${name#www.}"
+  name="${name%%/*}"
+  printf '%s\n' "$name"
+}
+
+_proxy_duration_ms() {
+  python3 - "$1" <<'PY'
+import sys
+
+try:
+    seconds = float(sys.argv[1])
+except (ValueError, IndexError):
+    print("0ms")
+else:
+    print(f"{seconds * 1000:.0f}ms")
+PY
+}
+
+_proxy_failure_reason() {
+  case "$1" in
+    5) printf '%s\n' 'dns failed' ;;
+    6) printf '%s\n' 'host not found' ;;
+    7) printf '%s\n' 'connect failed' ;;
+    28) printf '%s\n' 'timeout' ;;
+    35) printf '%s\n' 'tls failed' ;;
+    52) printf '%s\n' 'empty reply' ;;
+    56) printf '%s\n' 'connection reset' ;;
+    *)
+      if [ "$1" = "0" ]; then
+        printf '%s\n' 'request failed'
+      else
+        printf 'curl exit %s\n' "$1"
+      fi
+      ;;
+  esac
+}
+
+_proxy_print_summary() {
+  local success="$1"
+  local total="$2"
+  local failed="$3"
+
+  if [ "$failed" -eq 0 ]; then
+    printf '%b✔%b summary: %b%s/%s success%b, %s failed\n' \
+      "$_proxy_color_green" "$_proxy_color_reset" \
+      "$_proxy_color_green" "$success" "$total" "$_proxy_color_reset" \
+      "$failed"
+  else
+    printf '%b✘%b summary: %s/%s success, %b%s failed%b\n' \
+      "$_proxy_color_red" "$_proxy_color_reset" \
+      "$success" "$total" \
+      "$_proxy_color_red" "$failed" "$_proxy_color_reset"
+  fi
+}
+
+_proxy_print_header() {
+  local label="$1"
+  local value="$2"
+
+  printf '%b›%b %b%s%b %s\n' \
+    "$_proxy_color_blue" "$_proxy_color_reset" \
+    "$_proxy_color_dim" "$label" "$_proxy_color_reset" \
+    "$value"
+}
+
+_proxy_print_value_line() {
+  local label="$1"
+  local value="$2"
+
+  printf '  %b%-12s%b %s\n' \
+    "$_proxy_color_dim" "$label" "$_proxy_color_reset" \
+    "$value"
+}
+
+_proxy_print_action() {
+  local action="$1"
+  local detail="$2"
+
+  printf '%b✔%b %b%s%b %s\n' \
+    "$_proxy_color_green" "$_proxy_color_reset" \
+    "$_proxy_color_dim" "$action" "$_proxy_color_reset" \
+    "$detail"
+}
+
+_proxy_print_status_value() {
+  if [ "$1" = "未设置" ]; then
+    printf '%b%s%b\n' "$_proxy_color_dim" "$1" "$_proxy_color_reset"
+  else
+    printf '%s\n' "$1"
+  fi
+}
+
+_proxy_print_probe_result() {
+  local url="$1"
+  local http_code="$2"
+  local time_total="$3"
+  local curl_exit="$4"
+  local name
+  local duration_ms
+  local reason
+
+  name="$(_proxy_target_name "$url")"
+  duration_ms="$(_proxy_duration_ms "$time_total")"
+
+  if _proxy_is_success "$http_code"; then
+    printf '%b✔%b %-18s %b%s%b  %s\n' \
+      "$_proxy_color_green" "$_proxy_color_reset" \
+      "$name" \
+      "$_proxy_color_dim" "$http_code" "$_proxy_color_reset" \
+      "$duration_ms"
+  else
+    reason="$(_proxy_failure_reason "$curl_exit")"
+    printf '%b✘%b %-18s %b%s%b  %b%s%b\n' \
+      "$_proxy_color_red" "$_proxy_color_reset" \
+      "$name" \
+      "$_proxy_color_dim" "$http_code" "$_proxy_color_reset" \
+      "$_proxy_color_dim" "$reason" "$_proxy_color_reset"
+  fi
 }
 
 _proxy_test_all_targets() {
@@ -101,18 +241,18 @@ proxy() {
   case "$command" in
     on)
       _proxy_apply "$(_proxy_http_url)" "$(_proxy_socks5_url)"
-      echo "proxy on: http=${PROXY_HOST}:${PROXY_HTTP_PORT}, socks5=${PROXY_HOST}:${PROXY_SOCKS5_PORT}"
+      _proxy_print_action "proxy on" "http=${PROXY_HOST}:${PROXY_HTTP_PORT}, socks5=${PROXY_HOST}:${PROXY_SOCKS5_PORT}"
       ;;
     socks5)
       local socks_url
       socks_url="$(_proxy_socks5_url)"
       _proxy_apply "$socks_url" "$socks_url"
-      echo "proxy socks5: ${PROXY_HOST}:${PROXY_SOCKS5_PORT}"
+      _proxy_print_action "proxy socks5" "${PROXY_HOST}:${PROXY_SOCKS5_PORT}"
       ;;
     set)
       if [ $# -eq 1 ]; then
         _proxy_apply "$1" "$1"
-        echo "proxy set: $1"
+        _proxy_print_action "proxy set" "$1"
       elif [ $# -eq 2 ] && [ "$1" = "socks5" ]; then
         local socks_url="${2}"
         case "$socks_url" in
@@ -120,7 +260,7 @@ proxy() {
           *) socks_url="socks5://${socks_url}" ;;
         esac
         _proxy_apply "$socks_url" "$socks_url"
-        echo "proxy set socks5: ${socks_url}"
+        _proxy_print_action "proxy set socks5" "$socks_url"
       else
         echo "用法: proxy set <url> | proxy set socks5 <host:port>" >&2
         return 1
@@ -130,22 +270,41 @@ proxy() {
       unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
       unset all_proxy ALL_PROXY
       unset no_proxy NO_PROXY
-      echo "proxy off"
+      _proxy_print_action "proxy off" "cleared current shell"
       ;;
     status)
-      echo "http_proxy=${http_proxy:-${HTTP_PROXY:-未设置}}"
-      echo "https_proxy=${https_proxy:-${HTTPS_PROXY:-未设置}}"
-      echo "all_proxy=${all_proxy:-${ALL_PROXY:-未设置}}"
-      echo "no_proxy=${no_proxy:-${NO_PROXY:-未设置}}"
+      local current_http_proxy
+      local current_https_proxy
+      local current_all_proxy
+      local current_no_proxy
+
+      current_http_proxy="${http_proxy:-${HTTP_PROXY:-未设置}}"
+      current_https_proxy="${https_proxy:-${HTTPS_PROXY:-未设置}}"
+      current_all_proxy="${all_proxy:-${ALL_PROXY:-未设置}}"
+      current_no_proxy="${no_proxy:-${NO_PROXY:-未设置}}"
+
+      _proxy_print_header "status" "current shell"
+      _proxy_print_value_line "http_proxy" "$(_proxy_print_status_value "$current_http_proxy")"
+      _proxy_print_value_line "https_proxy" "$(_proxy_print_status_value "$current_https_proxy")"
+      _proxy_print_value_line "all_proxy" "$(_proxy_print_status_value "$current_all_proxy")"
+      _proxy_print_value_line "no_proxy" "$(_proxy_print_status_value "$current_no_proxy")"
       ;;
     test)
       local proxy_url
+      local url='https://www.google.com'
+      local http_code
+      local time_total
+      local curl_exit
       proxy_url="$(_proxy_current)" || {
         echo "未设置代理，请先运行 proxy on / proxy socks5 / proxy set ..." >&2
         return 1
       }
-      echo "testing: ${proxy_url}"
-      curl -x "$proxy_url" -I -sS --connect-timeout 5 --max-time 10 https://www.google.com | head -n 1
+      read -r http_code time_total curl_exit <<EOF
+$(_proxy_probe "$proxy_url" "$url")
+EOF
+      _proxy_print_header "proxy" "$proxy_url"
+      _proxy_print_probe_result "$url" "$http_code" "$time_total" "$curl_exit"
+      _proxy_is_success "$http_code"
       ;;
     test_all)
       local proxy_url
@@ -164,39 +323,55 @@ proxy() {
       local result_file
       local http_code
       local time_total
+      local curl_exit
+      local targets_data
+      local target_count=0
 
-      echo "testing all via: ${proxy_url}"
+      targets_data="$(_proxy_test_all_targets)"
 
+      _proxy_print_header "proxy" "$proxy_url"
       while IFS= read -r url; do
         [ -n "$url" ] || continue
-        index=$((index + 1))
-        total=$((total + 1))
-        (
-          _proxy_probe "$proxy_url" "$url" > "${tmp_dir}/${index}.result"
-        ) &
-        printf '%s\n' "$url" > "${tmp_dir}/${index}.url"
+        target_count=$((target_count + 1))
       done <<EOF
-$(_proxy_test_all_targets)
+$targets_data
+EOF
+      _proxy_print_header "targets" "$target_count"
+
+      {
+        set +m 2>/dev/null || true
+        while IFS= read -r url; do
+          [ -n "$url" ] || continue
+          index=$((index + 1))
+          total=$((total + 1))
+          (
+            _proxy_probe "$proxy_url" "$url" > "${tmp_dir}/${index}.result"
+          ) &
+          printf '%s\n' "$url" > "${tmp_dir}/${index}.url"
+        done <<EOF
+$targets_data
 EOF
 
-      wait
+        wait
+      } 2>/dev/null
 
       index=1
       while [ "$index" -le "$total" ]; do
         url=$(cat "${tmp_dir}/${index}.url")
         result_file="${tmp_dir}/${index}.result"
         if [ -f "$result_file" ]; then
-          read -r http_code time_total < "$result_file"
+          read -r http_code time_total curl_exit < "$result_file"
         else
-          http_code='FAILED'
+          http_code='000'
           time_total='0'
+          curl_exit='0'
         fi
 
+        _proxy_print_probe_result "$url" "$http_code" "$time_total" "$curl_exit"
+
         if _proxy_is_success "$http_code"; then
-          echo "[${http_code}] ${url} ${time_total}s"
           success=$((success + 1))
         else
-          echo "[${http_code}] ${url}"
           failed=$((failed + 1))
         fi
 
@@ -204,7 +379,7 @@ EOF
       done
 
       rm -rf "$tmp_dir"
-      echo "done: ${success}/${total} success, ${failed} failed"
+      _proxy_print_summary "$success" "$total" "$failed"
       [ "$failed" -eq 0 ]
       ;;
     git)
@@ -217,16 +392,23 @@ EOF
           }
           git config --global http.proxy "$proxy_url"
           git config --global https.proxy "$proxy_url"
-          echo "git proxy on: ${proxy_url}"
+          _proxy_print_action "git proxy on" "$proxy_url"
           ;;
         off)
           git config --global --unset http.proxy 2>/dev/null || true
           git config --global --unset https.proxy 2>/dev/null || true
-          echo "git proxy off"
+          _proxy_print_action "git proxy off" "cleared global config"
           ;;
         status)
-          echo "git http.proxy=$(git config --global --get http.proxy || echo 未设置)"
-          echo "git https.proxy=$(git config --global --get https.proxy || echo 未设置)"
+          local git_http_proxy
+          local git_https_proxy
+
+          git_http_proxy="$(git config --global --get http.proxy || echo 未设置)"
+          git_https_proxy="$(git config --global --get https.proxy || echo 未设置)"
+
+          _proxy_print_header "git" "global config"
+          _proxy_print_value_line "http.proxy" "$(_proxy_print_status_value "$git_http_proxy")"
+          _proxy_print_value_line "https.proxy" "$(_proxy_print_status_value "$git_https_proxy")"
           ;;
         *)
           echo "用法: proxy git on|off|status" >&2

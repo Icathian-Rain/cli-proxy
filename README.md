@@ -1,6 +1,6 @@
 # proxy.sh
 
-一个尽量简单的代理配置方案。
+一个尽量简单、适合个人 `zsh` 日常使用的代理配置方案。
 
 如果你主要是在自己的 `zsh` 里使用，推荐直接用仓库里的 `.proxy.sh`，把它 `source` 到 `~/.zshrc`。这样之后你就可以直接用 `proxy on/off/status/test/git ...`。
 
@@ -64,15 +64,53 @@ proxy set socks5 127.0.0.1:7897
 
 - `proxy status`
   - 查看当前会话代理变量
+  - 使用统一的彩色状态输出
 
 - `proxy test`
   - 用当前代理测试 Google 连通性
+  - 成功/失败使用符号和颜色表示
+  - 耗时以 `ms` 显示
 
 - `proxy test_all`
   - 并行测试多个常用站点
+  - 不打印 zsh 后台任务进程信息
+  - 失败时会显示常见原因，如 `timeout`、`connect failed`
 
 - `proxy git on|off|status`
   - 管理 `git config --global` 里的代理
+  - `proxy git status` 也使用统一的状态输出风格
+
+## 输出示例
+
+### `proxy test`
+
+```text
+› proxy http://127.0.0.1:7897
+✔ google.com         302  1329ms
+```
+
+### `proxy test_all`
+
+```text
+› proxy http://127.0.0.1:7897
+› targets 5
+✔ google.com         302  1389ms
+✔ github.com         200  4050ms
+✔ gitlab.com         301  4056ms
+✔ cloudflare.com     200  4247ms
+✔ microsoft.com      200   754ms
+✔ summary: 5/5 success, 0 failed
+```
+
+### `proxy status`
+
+```text
+› status current shell
+  http_proxy   未设置
+  https_proxy  未设置
+  all_proxy    未设置
+  no_proxy     未设置
+```
 
 ## 可选环境变量
 
@@ -86,4 +124,5 @@ proxy set socks5 127.0.0.1:7897
 - `.proxy.sh` 只影响当前 shell 会话和 Git 全局配置
 - 不会自动写入 `~/.zshrc`，需要你自己 `source`
 - 不会创建本地配置文件
+- `test_all` 内部会并发探测多个目标站点
 - 这是给个人 shell 环境用的简化版本，优先追求顺手，不追求复杂抽象
