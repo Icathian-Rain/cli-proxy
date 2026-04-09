@@ -145,8 +145,20 @@ EOF
             printf '%s\n' '未设置代理，请先运行 proxy on / proxy socks5 / proxy set ...' >&2
             return 1
           }
-          git config --global http.proxy "$proxy_git_url"
-          git config --global https.proxy "$proxy_git_url"
+          proxy_git_http_url="$(git config --global --get http.proxy 2>/dev/null)" && proxy_git_has_http_url=1 || proxy_git_has_http_url=0
+          if ! git config --global http.proxy "$proxy_git_url"; then
+            printf '%s\n' '设置 git http.proxy 失败' >&2
+            return 1
+          fi
+          if ! git config --global https.proxy "$proxy_git_url"; then
+            if [ "$proxy_git_has_http_url" -eq 1 ]; then
+              git config --global http.proxy "$proxy_git_http_url" >/dev/null 2>&1 || true
+            else
+              git config --global --unset http.proxy >/dev/null 2>&1 || true
+            fi
+            printf '%s\n' '设置 git https.proxy 失败' >&2
+            return 1
+          fi
           printf '%s\n' "git proxy on: ${proxy_git_url}"
           ;;
         off)

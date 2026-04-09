@@ -326,6 +326,8 @@ EOF
       local curl_exit
       local targets_data
       local target_count=0
+      local -a probe_pids=()
+      local probe_pid
 
       targets_data="$(_proxy_test_all_targets)"
 
@@ -347,12 +349,17 @@ EOF
           (
             _proxy_probe "$proxy_url" "$url" > "${tmp_dir}/${index}.result"
           ) &
+          probe_pid=$!
+          probe_pids+=("$probe_pid")
           printf '%s\n' "$url" > "${tmp_dir}/${index}.url"
         done <<EOF
 $targets_data
 EOF
 
-        wait
+        # Only wait for probes started by this invocation.
+        for probe_pid in "${probe_pids[@]}"; do
+          wait "$probe_pid"
+        done
       } 2>/dev/null
 
       index=1
@@ -386,12 +393,29 @@ EOF
       case "${1:-}" in
         on)
           local proxy_url
+          local git_http_proxy
+          local git_has_http_proxy=0
           proxy_url="$(_proxy_current)" || {
             echo "未设置代理，请先运行 proxy on / proxy socks5 / proxy set ..." >&2
             return 1
           }
-          git config --global http.proxy "$proxy_url"
-          git config --global https.proxy "$proxy_url"
+          git_http_proxy="$(git config --global --get http.proxy 2>/dev/null)" && git_has_http_proxy=1
+
+          if ! git config --global http.proxy "$proxy_url"; then
+            echo "设置 git http.proxy 失败" >&2
+            return 1
+          fi
+
+          if ! git config --global https.proxy "$proxy_url"; then
+            if [ "$git_has_http_proxy" -eq 1 ]; then
+              git config --global http.proxy "$git_http_proxy" >/dev/null 2>&1 || true
+            else
+              git config --global --unset http.proxy >/dev/null 2>&1 || true
+            fi
+            echo "设置 git https.proxy 失败" >&2
+            return 1
+          fi
+
           _proxy_print_action "git proxy on" "$proxy_url"
           ;;
         off)
