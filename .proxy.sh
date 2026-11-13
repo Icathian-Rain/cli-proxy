@@ -90,16 +90,13 @@ _proxy_target_name() {
 }
 
 _proxy_duration_ms() {
-  python3 - "$1" <<'PY'
-import sys
-
-try:
-    seconds = float(sys.argv[1])
-except (ValueError, IndexError):
-    print("0ms")
-else:
-    print(f"{seconds * 1000:.0f}ms")
-PY
+  awk -v seconds="$1" 'BEGIN {
+    if (seconds ~ /^[0-9]+(\.[0-9]+)?$/) {
+      printf "%.0fms\n", seconds * 1000
+    } else {
+      print "0ms"
+    }
+  }'
 }
 
 _proxy_failure_reason() {
