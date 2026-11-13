@@ -251,6 +251,10 @@ proxy() {
       ;;
     set)
       if [ $# -eq 1 ]; then
+        if [ "$1" = "socks5" ] || [ "$1" = "socks5h" ]; then
+          echo "用法: proxy set socks5 <host:port>" >&2
+          return 1
+        fi
         _proxy_apply "$1" "$1"
         _proxy_print_action "proxy set" "$1"
       elif [ $# -eq 2 ] && [ "$1" = "socks5" ]; then
