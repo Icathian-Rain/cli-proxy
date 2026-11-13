@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 ## 项目概述
 
-这是一个用于管理代理设置的 Shell 工具仓库，当前有两个入口：
+这是一个用于管理代理设置的 Shell 工具仓库，当前有三个入口：
 
 - `.proxy.sh`：当前完整版本，带彩色输出、连通性测试、批量测试
 - `.proxy.simple.sh`：新增的最简版本，保留基础代理管理和纯文本 `test`
+- `.proxy.menu.sh`：交互式菜单版本，source 同目录的 `.proxy.sh` 并注册 `proxy menu`
 
 ## 当前行为模型
 
@@ -68,3 +69,4 @@ proxy git status
 - **默认配置**: 通过 `PROXY_HOST`、`PROXY_HTTP_PORT`、`PROXY_SOCKS5_PORT`、`PROXY_NO_PROXY` 覆盖默认值
 - **自动开启**: 设置 `PROXY_AUTO_ON`（`1`/`http`/`on` → `proxy on`，`socks5` → `proxy socks5`）时，source 脚本会自动开启代理；不设置则不自动开启
 - **Git 集成**: 使用 `git config --global` 设置 Git HTTP/HTTPS 代理
+- **菜单版**: `.proxy.menu.sh` 内部 source 同目录 `.proxy.sh` 复用全部函数；有 `fzf` 时用 fzf 交互，无则回退数字菜单；退出时若会话有代理会询问是否关闭；不写任何配置文件

@@ -237,6 +237,16 @@ proxy() {
   shift 2>/dev/null || true
 
   case "$command" in
+    menu)
+      # 委托给 .proxy.menu.sh（若已 source）；不用 functions[] 复制函数，zsh 会损坏多字节 UTF-8
+      if [ "$(whence -w _proxy_menu 2>/dev/null)" = "_proxy_menu: function" ]; then
+        shift 2>/dev/null || true
+        _proxy_menu "$@"
+      else
+        echo "菜单未加载，请先 source .proxy.menu.sh" >&2
+        return 1
+      fi
+      ;;
     on)
       _proxy_apply "$(_proxy_http_url)" "$(_proxy_socks5_url)"
       _proxy_print_action "proxy on" "http=${PROXY_HOST}:${PROXY_HTTP_PORT}, socks5=${PROXY_HOST}:${PROXY_SOCKS5_PORT}"

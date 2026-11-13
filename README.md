@@ -1,9 +1,10 @@
 # proxy.sh
 
-一个用于个人 shell 日常使用的代理脚本仓库，当前同时提供两个版本：
+一个用于个人 shell 日常使用的代理脚本仓库，当前同时提供三个入口：
 
 - `.proxy.sh`：当前完整版本，带彩色输出、连通性测试、批量测试
 - `.proxy.simple.sh`：最简版本，保留基础代理管理和 `test`，不带彩色输出
+- `.proxy.menu.sh`：交互式菜单版本，复用 `.proxy.sh` 全部能力
 
 ## 推荐用法
 
@@ -61,6 +62,22 @@ proxy git on
 proxy git status
 proxy git off
 ```
+
+### 菜单版：`.proxy.menu.sh`
+
+如果你更喜欢交互式操作，可以使用：
+
+```zsh
+source /绝对路径/cli-proxy/.proxy.menu.sh
+proxy menu
+```
+
+菜单版会自动 source 同目录的 `.proxy.sh`，并注册 `proxy menu` 子命令：
+
+- 装了 `fzf` 时使用 fzf 交互选择（底部弹窗，支持模糊搜索）
+- 未装 `fzf` 时自动回退为数字菜单，功能完全一致
+- 覆盖全部操作：开/关代理、自定义地址、状态、`test`/`test_all`、Git 代理、修改默认地址
+- 退出时若当前会话有代理，会询问是否关闭
 
 ## 命令说明
 
