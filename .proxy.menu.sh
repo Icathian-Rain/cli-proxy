@@ -27,6 +27,31 @@ _proxy_menu_has_fzf() {
   command -v fzf >/dev/null 2>&1
 }
 
+# 状态栏: 一行显示当前代理情况
+# $1 = plain 时输出纯文本（给 fzf --header 用，不渲染 ANSI 颜色）
+_proxy_menu_status_bar() {
+  local current
+  if current="$(_proxy_current 2>/dev/null)"; then
+    if [ "${1:-}" = "plain" ]; then
+      printf '● proxy %s  已开启\n' "$current"
+    else
+      printf '%b● proxy%b %s  %b已开启%b\n' \
+        "$_proxy_color_green" "$_proxy_color_reset" \
+        "$current" \
+        "$_proxy_color_green" "$_proxy_color_reset"
+    fi
+  else
+    if [ "${1:-}" = "plain" ]; then
+      printf '○ proxy 未开启  (默认 %s:%s)\n' "$PROXY_HOST" "$PROXY_HTTP_PORT"
+    else
+      printf '%b○ proxy%b %b未开启%b  (默认 %s:%s)\n' \
+        "$_proxy_color_dim" "$_proxy_color_reset" \
+        "$_proxy_color_dim" "$_proxy_color_reset" \
+        "$PROXY_HOST" "$PROXY_HTTP_PORT"
+    fi
+  fi
+}
+
 _proxy_menu_prompt() {
   printf '%b按回车返回菜单%b' "$_proxy_color_dim" "$_proxy_color_reset"
   read -r _
@@ -35,7 +60,9 @@ _proxy_menu_prompt() {
 
 _proxy_menu_read_url() {
   local input
-  printf '输入代理地址 (如 http://127.0.0.1:7897 或 socks5 127.0.0.1:7897): '
+  printf '输入代理地址 (如 http://127.0.0.1:7897 或 socks5 127.0.0.1:7897)\n'
+  printf '%b直接回车 = 取消并返回菜单%b\n' "$_proxy_color_dim" "$_proxy_color_reset"
+  printf '> '
   read -r input
   case "$input" in
     'socks5 '*|'socks5h '*)
@@ -48,7 +75,7 @@ _proxy_menu_read_url() {
       return 1
       ;;
     '')
-      return 1
+      _proxy_print_action "取消" "未修改代理设置"
       ;;
     *)
       proxy set "$input"
@@ -88,6 +115,19 @@ _proxy_menu_confirm_off() {
 # 菜单主体
 # ---------------------------------------------------------------------------
 
+# 测试动作包一层进度提示，避免用户以为卡住
+_proxy_menu_test() {
+  printf '%b⏳ 正在测试当前代理，最长等待 10 秒…%b\n' "$_proxy_color_dim" "$_proxy_color_reset"
+  proxy test
+}
+
+_proxy_menu_test_all() {
+  local count
+  count="$(_proxy_test_all_targets | grep -c .)"
+  printf '%b⏳ 正在并行测试 %s 个站点，最长等待 10 秒…%b\n' "$_proxy_color_dim" "$count" "$_proxy_color_reset"
+  proxy test_all
+}
+
 _proxy_menu_actions() {
   local choice="$1"
 
@@ -97,8 +137,8 @@ _proxy_menu_actions() {
     "自定义代理地址"|set) _proxy_menu_read_url ;;
     "关闭代理"|off) proxy off ;;
     "查看状态"|status) proxy status ;;
-    "测试当前代理"|test) proxy test ;;
-    "批量测试"|test_all) proxy test_all ;;
+    "测试当前代理"|test) _proxy_menu_test ;;
+    "批量测试"|test_all) _proxy_menu_test_all ;;
     "Git 代理开启"|git-on) proxy git on ;;
     "Git 代理关闭"|git-off) proxy git off ;;
     "Git 代理状态"|git-status) proxy git status ;;
@@ -110,6 +150,8 @@ _proxy_menu_actions() {
 
 _proxy_menu_fzf() {
   local choice
+  local status_line
+  status_line="$(_proxy_menu_status_bar plain)"
   choice=$(printf '%s\n' \
     '开启 HTTP 代理' \
     '开启 SOCKS5 代理' \
@@ -124,7 +166,8 @@ _proxy_menu_fzf() {
     '修改默认地址' \
     '帮助' \
     '退出' \
-    | fzf --height 40% --reverse --border --prompt 'proxy ❯ ' --header '选择操作 (Enter 确认, Esc 退出)') || {
+    | fzf --height 40% --reverse --border --prompt 'proxy ❯ ' \
+        --header "${status_line}选择操作 (Enter 确认, Esc 退出)") || {
     # Esc / Ctrl-C 退出
     if _proxy_current >/dev/null 2>&1; then
       printf '\n'
@@ -155,7 +198,8 @@ _proxy_menu_numeric() {
   local choice
   while true; do
     printf '\n'
-    _proxy_print_header "proxy menu" "输入数字选择操作"
+    _proxy_menu_status_bar
+    printf '%b─────────────────────────────%b\n' "$_proxy_color_dim" "$_proxy_color_reset"
     cat <<EOF
   1) 开启 HTTP 代理      ${PROXY_HOST}:${PROXY_HTTP_PORT}
   2) 开启 SOCKS5 代理    ${PROXY_HOST}:${PROXY_SOCKS5_PORT}
