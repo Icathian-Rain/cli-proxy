@@ -145,6 +145,11 @@ no_proxy=未设置
 - `PROXY_HTTP_PORT`
 - `PROXY_SOCKS5_PORT`
 - `PROXY_NO_PROXY`
+- `PROXY_AUTO_ON`
+  - source 时自动开启代理，不设置则不自动开启
+  - `1` / `http` / `on` → 自动 `proxy on`
+  - `socks5` → 自动 `proxy socks5`
+  - 示例：`export PROXY_AUTO_ON=1` 后再 `source` 脚本
 
 ## 说明
 

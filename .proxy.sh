@@ -228,6 +228,7 @@ proxy 用法:
   PROXY_HTTP_PORT
   PROXY_SOCKS5_PORT
   PROXY_NO_PROXY
+  PROXY_AUTO_ON           source 时自动开启代理 (1/http=on, socks5=socks5)
 EOF
 }
 
@@ -451,3 +452,13 @@ EOF
       ;;
   esac
 }
+
+# source 时按 PROXY_AUTO_ON 自动开启代理: 1/http -> proxy on, socks5 -> proxy socks5
+case "${PROXY_AUTO_ON:-}" in
+  1|http|on)
+    proxy on
+    ;;
+  socks5)
+    proxy socks5
+    ;;
+esac

@@ -66,4 +66,5 @@ proxy git status
 - **代理类型**: 支持 HTTP、HTTPS、SOCKS5、SOCKS5H
 - **状态来源**: 以当前 Shell 环境变量为唯一真实来源
 - **默认配置**: 通过 `PROXY_HOST`、`PROXY_HTTP_PORT`、`PROXY_SOCKS5_PORT`、`PROXY_NO_PROXY` 覆盖默认值
+- **自动开启**: 设置 `PROXY_AUTO_ON`（`1`/`http`/`on` → `proxy on`，`socks5` → `proxy socks5`）时，source 脚本会自动开启代理；不设置则不自动开启
 - **Git 集成**: 使用 `git config --global` 设置 Git HTTP/HTTPS 代理
